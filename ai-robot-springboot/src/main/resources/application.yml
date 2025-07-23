@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  ai:
+    deepseek:
+      api-key: sk-c2f36f37e70a487c95ffbcd91511c326
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-chat # 模型
+          temperature: 0.8 # 温度值
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor: debug
