@@ -40,6 +40,7 @@ public class AliyunBailianController {
         // 构建提示词
         Prompt prompt = new Prompt(new UserMessage(message));
 
+
         // 流式输出
         return chatModel.stream(prompt)
                 .mapNotNull(chatResponse -> {
