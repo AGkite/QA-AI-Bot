@@ -2,6 +2,7 @@ package com.newone.ai.robot.controller;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,9 +32,11 @@ public class ChatClientController {
     }
 
     @GetMapping(value = "/generateStream", produces = "text/html;charset=utf-8")
-    public Flux<String> generateStream(@RequestParam(value = "message", defaultValue = "你是谁？") String message) {
+    public Flux<String> generateStream(@RequestParam(value = "message", defaultValue = "你是谁？") String message,
+                                       @RequestParam(value = "chatId") String chatId) {
         return chatClient.prompt()
                 .user(message)
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, chatId))
                 .stream()
                 .content();
     }
