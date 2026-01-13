@@ -1,37 +1,34 @@
 <template>
-    <div class="h-screen max-w-3xl mx-auto relative">
+    <div class="h-screen flex flex-col overflow-y-auto" ref="chatContainer">
         <!-- 聊天记录区域 -->
-        <div class="overflow-y-auto pb-24 pt-4 px-4">
-            <!-- 聊天记录区域 -->
-             <div class="overflow-y-auto pb-24 pt-4 px-4">
-                <!-- 遍历聊天记录 -->
-                 <template v-for="(chat, index) in chatList" :key="index">
-                    <!-- 用户提问消息（靠右） -->
-                    <div v-if="chat.role === 'user'" class="flex justify-end mb-4">
-                        <div class="question-container">
-                            <p>{{ chat.content }}</p>
+        <div class="flex-1 max-w-3xl mx-auto pb-24 pt-4 px-4">
+            <!-- 遍历聊天记录 -->
+            <template v-for="(chat, index) in chatList" :key="index">
+                <!-- 用户提问消息（靠右）-->
+                <div v-if="chat.role === 'user'" class="flex justify-end mb-4">
+                    <div class="question-container">
+                        <p>{{ chat.content }}</p>
+                    </div>
+                </div>
+                
+                <!-- 大模型回复消息（靠左） -->
+                <div v-else class="flex mb-4">
+                    <!-- 头像 -->
+                    <div class="flex-shrink-0 mr-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
+                            <SvgIcon name="deepseek-logo" customCss="w-5 h-5"></SvgIcon>
                         </div>
                     </div>
-                    
-                    <!-- 大模型回复消息（靠左） -->
-                    <div v-else class="flex mb-4">
-                        <!-- 头像 -->
-                        <div class="flex-shrink-0 mr-3">
-                            <div class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-200">
-                                <SvgIcon name="deepseek-logo" customCss="w-5 h-5"></SvgIcon>
-                            </div>
-                        </div>
-                        <!-- 回复的内容 -->
-                        <div class="p-1 max-w-[80%] mb-2">
-                            <p>{{ chat.content }}</p>
-                        </div>
+                    <!-- 回复的内容 -->
+                    <div class="p-1 mb-2 max-w-[90%]">
+                        <StreamMarkdownRender :content="chat.content" />
                     </div>
-                 </template>
-             </div>
+                </div>
+            </template>
         </div>
         <!-- 提问输入框 -->
-        <div class="absolute bottom-0 left-0 w-full mb-5">
-            <div class="bg-gray-100 rounded-3xl px-4 py-3 mx-4 border border-gray-200">
+        <div class="sticky max-w-3xl mx-auto bg-white bottom-0 left-0 w-full mb-5">
+            <div class="bg-gray-100 rounded-3xl px-4 py-3 mx-4 border border-gray-200 flex flex-col">
                 <textarea 
                     v-model="message"
                     placeholder="询问任何问题"
@@ -62,8 +59,9 @@
 </template>
 
 <script setup>
+import StreamMarkdownRender from '@/components/StreamMarkdownRender.vue';
 import SvgIcon from '@/components/SvgIcon.vue';
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount, nextTick } from 'vue';
 
 // 输入的消息
 const message = ref('')
@@ -74,9 +72,29 @@ const textareaRef = ref(null);
 // 自动调整文本域高度
 const autoResize = () => {
     const textarea = textareaRef.value;
-    if (textarea) { // 若文本域存在
-        textarea.style.height = 'auto'; // 1. 先将高度重置为 'auto'
-        textarea.style.height = textarea.scrollHeight + 'px'; // 2. 再设置为内容的实际高度
+    if (textarea) {
+        // 重置高度以获取正确的滚动高度
+        textarea.style.height = 'auto';
+        
+        // 计算新高度，但最大不超过 300px
+        const newHeight = Math.min(textarea.scrollHeight, 300);
+        textarea.style.height = newHeight + 'px';
+
+        // 如果内容超过 300px，则启用滚动
+        textarea.style.overflowY = textarea.scrollHeight > 300 ? 'auto' : 'hidden';
+    }
+}
+
+// 聊天容器引用
+const chatContainer = ref(null)
+
+// 滚动到底部
+const scrollToBottom = async () => {
+    await nextTick() // 等待 Vue.js 完成 DOM 更新
+    if (chatContainer.value) { // 若容器存在
+        // 将容器的滚动条位置设置到最底部
+        const container = chatContainer.value;
+        container.scrollTop = container.scrollHeight;
     }
 }
 
@@ -115,13 +133,17 @@ const sendMessage = async () => {
 
         // 处理消息事件
         eventSource.onmessage = (event) => {
-            console.log('接收到数据：', event.data)
+            console.log('接收到数据：', event.data + '---')
             if (event.data) {  // 若响应数据不为空
+                // 解释 JSON
+                let response = JSON.parse(event.data)
                 // 持续追加流失回答
-                responseText += event.data
+                responseText += response.v
 
                 // 更新最后一条消息
                 chatList.value[chatList.value.length - 1].content = responseText;
+                // 滚动到底部
+                scrollToBottom()
             }
         }
 
@@ -137,11 +159,15 @@ const sendMessage = async () => {
 
             // 关闭 SSE
             closeSSE()
+            // 滚动到底部
+            scrollToBottom()
         }
     } catch (error) {
         console.error('发送消息错误：', error)
         // 提示用户“请求出错”
         chatList.value[chatList.value.length - 1].content = '抱歉，请求出错了，请稍后重试。';
+        // 滚动到底部
+        scrollToBottom()
     }
 }
 
@@ -172,4 +198,10 @@ onBeforeUnmount(() => {
     max-width: calc(100% - 48px);
     position: relative;
 }
+
+/* 聊天内容区域样式 */
+.overflow-y-auto {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent; /* 自定义滚动条颜色 */
+}
+
 </style>
